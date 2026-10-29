@@ -1,0 +1,32 @@
+# Keeps the rstarkey/OrcaSlicer fork's main merged with OrcaSlicer/OrcaSlicer main.
+# Rob Starkey <rstarkey@gmail.com>, created 2026-10-28 22:09 PDT
+#
+# Needs secret SYNC_TOKEN: a fine-grained token for this repo with read/write on
+# Contents, Workflows (upstream edits .github/workflows) and Actions (to disable).
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sync:
+    if: github.repository == 'rstarkey/OrcaSlicer'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # Before the merge: a push made with a token triggers upstream's CI here.
+      - name: Disable every other workflow
+        run: |
+          gh workflow list --all --json id,path,state --jq '.[]
+            | select(.state == "active")
+            | select(.path != ".github/workflows/sync-upstream.yml")
+            | .id' | xargs -r -n1 gh workflow disable
+
+      - name: Merge upstream main
+        run: gh api -X POST "repos/$GH_REPO/merge-upstream" -f branch=main
